@@ -87871,9 +87871,9 @@
     }
   ],
   "wordclouds": {
-    "positive": "wordcloud_positive.png",
-    "neutral": "wordcloud_neutral.png",
-    "negative": "wordcloud_negative.png"
+    "positive": "./data/wordcloud_positive.png",
+    "neutral": "./data/wordcloud_neutral.png",
+    "negative": "./data/wordcloud_negative.png"
   },
   "timeline": [
     {
