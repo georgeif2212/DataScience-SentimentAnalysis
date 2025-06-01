@@ -24,7 +24,7 @@ timeline['date'] = pd.to_datetime(timeline['date'])
 
 # ----------------------------------------------------------------------------
 # Título y documentación
-st.title('Análisis de Sentimiento de Tweets sobre Starbucks')
+st.title('Análisis de Sentimiento de Tweets de Aerolíneas en Estados Unidos')
 
 with st.expander('📝 Documentación del proyecto'):
     st.markdown("""
