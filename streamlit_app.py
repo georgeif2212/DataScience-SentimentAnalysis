@@ -1,151 +1,111 @@
 import streamlit as st
 import pandas as pd
-import math
+import json
 from pathlib import Path
+from PIL import Image
 
-# Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
+    page_title='Análisis de Sentimiento de Tweets',
+    page_icon=':bar_chart:',
 )
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# ----------------------------------------------------------------------------
+# Cargar datos desde JSON
+DATA_PATH = Path(__file__).parent / 'data/sentiment_results.json'
+with open(DATA_PATH, 'r', encoding='utf-8') as f:
+    data = json.load(f)
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+tweets = pd.DataFrame(data['tweets'])
+timeline = pd.DataFrame(data['timeline'])
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# Convertir la columna de fecha en datetime
+tweets['tweet_created'] = pd.to_datetime(tweets['tweet_created'])
+timeline['date'] = pd.to_datetime(timeline['date'])
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+# ----------------------------------------------------------------------------
+# Título y documentación
+st.title('Análisis de Sentimiento de Tweets sobre Starbucks')
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+with st.expander('📝 Documentación del proyecto'):
+    st.markdown("""
+    **Origen del dataset:**
+    El dataset fue recolectado desde Twitter, conteniendo más de 87,000 tweets relacionados con la marca Starbucks.
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+    **Preprocesamiento:**
+    - Se eliminaron menciones, hashtags, URLs, signos de puntuación y caracteres especiales.
+    - Los textos fueron convertidos a minúsculas.
+    - Se eliminaron palabras vacías (stopwords).
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+    **Modelo utilizado:**
+    - Se empleó VADER (Valence Aware Dictionary and sEntiment Reasoner) para el análisis de sentimientos.
+    - Los tweets fueron clasificados como **positivos**, **negativos** o **neutrales** con base en su puntaje de compound.
 
-    return gdp_df
+    **Limitaciones:**
+    - El análisis se basa en texto sin contexto, lo que puede causar errores de interpretación (por ejemplo, sarcasmo).
+    - VADER está optimizado para inglés y puede fallar en expresiones coloquiales o multilingües.
+    """)
 
-gdp_df = get_gdp_data()
+# ----------------------------------------------------------------------------
+# Estadísticas generales
+st.subheader('📊 Estadísticas Generales')
+st.markdown("Porcentaje de cada categoría de sentimiento")
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
+col1, col2 = st.columns(2)
 
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
+with col1:
+    st.image('./data/grafico_porcentaje_sentimiento.png', caption='Distribución de Sentimientos')
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
+with col2:
+    st.json(data['summary'])
 
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
+# ----------------------------------------------------------------------------
+# Gráfico de línea: serie temporal de sentimientos
+st.subheader('📈 Sentimientos a lo largo del tiempo')
 
 st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
+    timeline.set_index('date')[['positive', 'neutral', 'negative']],
+    use_container_width=True
 )
 
-''
-''
+# ----------------------------------------------------------------------------
+# Nube de palabras por sentimiento
+st.subheader('☁️ Nube de palabras por sentimiento')
 
+sentiment_option = st.selectbox('Selecciona un sentimiento:', ['positive', 'neutral', 'negative'])
 
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
+st.image(data['wordclouds'][sentiment_option], caption=f'Nube de palabras: {sentiment_option}')
 
-st.header(f'GDP in {to_year}', divider='gray')
+# ----------------------------------------------------------------------------
+# Filtros para tweets
+st.subheader('🔍 Filtro de tweets')
 
-''
+col1, col2 = st.columns(2)
 
-cols = st.columns(4)
+with col1:
+    selected_sentiment = st.selectbox('Filtrar por sentimiento:', ['Todos'] + list(tweets['sentiment'].unique()))
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+with col2:
+    date_range = st.date_input(
+        'Seleccionar rango de fechas:',
+        value=(tweets['tweet_created'].min().date(), tweets['tweet_created'].max().date())
+    )
 
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
+filtered_df = tweets.copy()
+if selected_sentiment != 'Todos':
+    filtered_df = filtered_df[filtered_df['sentiment'] == selected_sentiment]
 
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+filtered_df = filtered_df[
+    (filtered_df['tweet_created'].dt.date >= date_range[0]) &
+    (filtered_df['tweet_created'].dt.date <= date_range[1])
+]
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+st.write(f"Se encontraron {len(filtered_df)} tweets con los filtros aplicados.")
+
+st.dataframe(filtered_df[['tweet_created', 'sentiment', 'clean_text']].head(20), use_container_width=True)
+
+# ----------------------------------------------------------------------------
+# Footer
+st.markdown("""
+---
+**Creado por .** Proyecto académico de análisis de sentimientos con Streamlit.
+""")
