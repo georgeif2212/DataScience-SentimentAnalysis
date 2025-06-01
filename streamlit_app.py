@@ -29,7 +29,7 @@ st.title('Análisis de Sentimiento de Tweets de Aerolíneas en Estados Unidos')
 with st.expander('📝 Documentación del proyecto'):
     st.markdown("""
     **Origen del dataset:**
-    El dataset fue recolectado desde Twitter, conteniendo más de 87,000 tweets relacionados con la marca Starbucks.
+    El dataset fue recolectado desde Twitter, conteniendo más de 87,000 tweets .
 
     **Preprocesamiento:**
     - Se eliminaron menciones, hashtags, URLs, signos de puntuación y caracteres especiales.
